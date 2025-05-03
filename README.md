@@ -42,11 +42,11 @@ A modern Python desktop application to batch download IEEE research papers from 
 
 ### Main Interface
 
-![Main Interface](Screenshot/1.jpeg)
+![Main Interface](/Screenshot/1.jpeg)
 
 ### Download Progress
 
-![Download Progress](Screenshot/2.jpeg)
+![Download Progress](/Screenshot/2.jpeg)
 ---
 
 ## Installation
