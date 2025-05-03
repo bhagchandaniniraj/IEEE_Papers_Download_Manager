@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import requests
+import browser_cookie3
 import csv
 import os
 import threading
@@ -22,31 +23,54 @@ class DownloadManager(ctk.CTk):
         self.title("IEEE Paper Download Manager")
         self.geometry("1000x600")
         self.current_process = None
+        self.stats = {'total': 0, 'success': 0, 'failed': 0, 'skipped': 0}
         self.selected_csv = ""
         self.base_path = ""
-        self.paused = threading.Event()  # ← Initialize first
-        self.stopped = threading.Event()  # ← Initialize first
+        self.cookies = None
+        self.paused = threading.Event()
+        self.stopped = threading.Event()
         self._setup_ui()
         self.reset_all()
 
     def _setup_ui(self):
-        self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_columnconfigure(0, weight=1)
+
+        # Main Frame
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-        file_frame = ctk.CTkFrame(self.main_frame)
-        file_frame.pack(pady=10, fill="x")
-        self.csv_entry = ctk.CTkEntry(file_frame, width=400)
+
+        # Control Panel
+        control_frame = ctk.CTkFrame(self.main_frame)
+        control_frame.pack(pady=10, fill="x")
+
+        # Cookie Section
+        cookie_frame = ctk.CTkFrame(control_frame)
+        cookie_frame.pack(side="left", padx=5)
+        ctk.CTkButton(cookie_frame, text="Fetch Cookies", 
+                    command=self.fetch_cookies, width=120).pack(side="left")
+        
+        # File Selection
+        file_frame = ctk.CTkFrame(control_frame)
+        file_frame.pack(side="left", padx=5)
+        self.csv_entry = ctk.CTkEntry(file_frame, width=300)
         self.csv_entry.pack(side="left", padx=5)
         ctk.CTkButton(file_frame, text="Browse CSV", width=100,
-                     command=self.browse_csv).pack(side="left", padx=5)
+                    command=self.browse_csv).pack(side="left")
+
+        # Base Path Display
         self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", anchor="w")
         self.base_path_label.pack(fill="x", padx=20, pady=5)
+
+        # Progress Section
         self.progress_label = ctk.CTkLabel(self.main_frame, text="Ready", font=("Arial", 14))
         self.progress_label.pack(pady=5)
         self.progress_bar = ctk.CTkProgressBar(self.main_frame)
         self.progress_bar.pack(fill="x", padx=20, pady=5)
         self.progress_bar.set(0)
+
+        # Stats Panel
         stats_frame = ctk.CTkFrame(self.main_frame)
         stats_frame.pack(pady=10)
         self.stats_labels = {
@@ -57,6 +81,8 @@ class DownloadManager(ctk.CTk):
         }
         for label in self.stats_labels.values():
             label.pack(side="left", padx=10)
+
+        # Content Tabs
         self.tab_view = ctk.CTkTabview(self.main_frame)
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
         self.tabs = {}
@@ -65,15 +91,49 @@ class DownloadManager(ctk.CTk):
             scroll_frame = ctk.CTkScrollableFrame(tab)
             scroll_frame.pack(fill="both", expand=True)
             self.tabs[name.lower()] = scroll_frame
+
         # Control Buttons
-        control_frame = ctk.CTkFrame(self.main_frame)
-        control_frame.pack(pady=10)
-        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", command=self.start_process)
+        btn_frame = ctk.CTkFrame(self.main_frame)
+        btn_frame.pack(pady=10)
+        self.start_btn = ctk.CTkButton(btn_frame, text="Start Download", command=self.start_process)
         self.start_btn.pack(side="left", padx=10)
-        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", command=self.toggle_pause, state="disabled")
+        self.pause_btn = ctk.CTkButton(btn_frame, text="Pause", command=self.toggle_pause, state="disabled")
         self.pause_btn.pack(side="left", padx=10)
-        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", command=self.stop_process, state="disabled")
+        self.stop_btn = ctk.CTkButton(btn_frame, text="Stop", command=self.stop_process, state="disabled")
         self.stop_btn.pack(side="left", padx=10)
+
+        # Status Bar
+        status_bar = ctk.CTkFrame(self, height=30, corner_radius=0)
+        status_bar.grid(row=1, column=0, sticky="ew")
+        ctk.CTkLabel(status_bar, text="Developed by Niraj Bhagchandani", 
+                   font=("Arial", 12, "italic")).pack(side="right", padx=10)
+
+    def fetch_cookies(self):
+        try:
+            cookies = browser_cookie3.load(domain_name='ieeexplore.ieee.org')
+            required_cookies = ['JSESSIONID', 'ERIGHTS', 'xpluserinfo', 'ipCheck', 'seqId']
+            self.cookies = {c.name: c.value for c in cookies if c.name in required_cookies}
+            
+            if not self.cookies:
+                messagebox.showwarning("Warning", "No institutional cookies found. Downloads may fail for protected content.")
+            else:
+                messagebox.showinfo("Success", "Institutional cookies loaded successfully!")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch cookies: {str(e)}")
+            self.cookies = None
+
+    def browse_csv(self):
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if file_path:
+            self.selected_csv = file_path
+            self.csv_entry.delete(0, "end")
+            self.csv_entry.insert(0, file_path)
+            filename = os.path.basename(file_path)
+            base_name = os.path.splitext(filename)[0]
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_\- ]', '_', base_name)
+            self.base_path = sanitized_name.replace(' ', '_')
+            self.base_path_label.configure(text=f"Base Path: {self.base_path}")
 
     def reset_all(self):
         self.stats = {'total': 0, 'success': 0, 'failed': 0, 'skipped': 0}
@@ -88,18 +148,6 @@ class DownloadManager(ctk.CTk):
         self.paused.clear()
         self.stopped.clear()
 
-    def browse_csv(self):
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
-        if file_path:
-            self.selected_csv = file_path
-            self.csv_entry.delete(0, "end")
-            self.csv_entry.insert(0, file_path)
-            filename = os.path.basename(file_path)
-            base_name = os.path.splitext(filename)[0]
-            sanitized_name = re.sub(r'[^a-zA-Z0-9_\- ]', '_', base_name)
-            self.base_path = sanitized_name.replace(' ', '_')
-            self.base_path_label.configure(text=f"Base Path: {self.base_path}")
-
     def create_card(self, tab_name, title, status, url):
         parent = self.tabs[tab_name]
         frame = ctk.CTkFrame(parent, corner_radius=10)
@@ -112,12 +160,12 @@ class DownloadManager(ctk.CTk):
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         if status == 'failed':
             ctk.CTkButton(btn_frame, text="Retry", width=80,
-                         command=lambda: self.retry_download(url)).pack(pady=2)
+                        command=lambda: self.retry_download(url)).pack(pady=2)
             ctk.CTkButton(btn_frame, text="Open Link", width=80,
-                         command=lambda: self.open_link(url)).pack(pady=2)
+                        command=lambda: self.open_link(url)).pack(pady=2)
         else:
             ctk.CTkButton(btn_frame, text="Open", width=80,
-                         command=lambda: self.open_file(url)).pack(pady=2)
+                        command=lambda: self.open_file(url)).pack(pady=2)
         btn_frame.pack(side="right", padx=10)
         frame.pack(fill="x", padx=5, pady=2)
 
@@ -160,6 +208,7 @@ class DownloadManager(ctk.CTk):
             messagebox.showerror("Error", "No CSV file selected!")
             self.after(0, lambda: self.start_btn.configure(state="normal"))
             return
+
         self.queue = []
         try:
             with open(self.selected_csv, 'r', encoding='utf-8') as f:
@@ -219,18 +268,33 @@ class DownloadManager(ctk.CTk):
                 pdf_url = self.get_pdf_url(entry['url'])
                 if not pdf_url:
                     raise ValueError("PDF URL not found")
-                response = requests.get(pdf_url, headers=HEADERS, timeout=30)
+                
+                # Use cookies if available
+                cookies = self.cookies if self.cookies else {}
+                
+                response = requests.get(
+                    pdf_url,
+                    headers=HEADERS,
+                    cookies=cookies,
+                    timeout=30
+                )
                 response.raise_for_status()
+                
                 if not self.is_valid_pdf(response.content):
                     raise ValueError("Invalid PDF content")
+                
                 output_path = self.get_output_path(entry)
+                
                 with open(output_path, 'wb') as f:
                     f.write(response.content)
+                
                 self.stats['success'] += 1
                 self.after(0, lambda e=entry, p=output_path: self.create_card("downloaded", e['title'], 'success', p))
                 return
+
             except Exception as e:
                 print(f"Attempt {attempt+1} failed: {str(e)}")
+        
         self.stats['failed'] += 1
         self.after(0, lambda e=entry: self.create_card("failed", e['title'], 'failed', e['url']))
 
