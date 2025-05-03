@@ -8,7 +8,11 @@ import threading
 import re
 from urllib.parse import urlparse, parse_qs
 import time
+import winreg
+import sys
+import ctypes
 
+# Configuration
 MAX_RETRIES = 2
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -17,11 +21,41 @@ HEADERS = {
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+def get_default_browser():
+    try:
+        reg_path = r'Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice'
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path) as key:
+            prog_id = winreg.QueryValueEx(key, 'ProgId')[0]
+        
+        cmd_reg_path = fr'{prog_id}\shell\open\command'
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, cmd_reg_path) as key:
+            cmd = winreg.QueryValueEx(key, None)[0]
+        
+        if 'chrome' in cmd.lower():
+            return "Google Chrome"
+        elif 'firefox' in cmd.lower():
+            return "Mozilla Firefox"
+        elif 'edge' in cmd.lower():
+            return "Microsoft Edge"
+        return "Unknown Browser"
+    except Exception:
+        return "Browser Detection Failed"
+
 class DownloadManager(ctk.CTk):
     def __init__(self):
         super().__init__()
+        if not is_admin():
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+            sys.exit()
+            
         self.title("IEEE Paper Download Manager")
-        self.geometry("1000x600")
+        self.geometry("1200x800")
         self.current_process = None
         self.stats = {'total': 0, 'success': 0, 'failed': 0, 'skipped': 0}
         self.selected_csv = ""
@@ -41,31 +75,36 @@ class DownloadManager(ctk.CTk):
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Control Panel
-        control_frame = ctk.CTkFrame(self.main_frame)
-        control_frame.pack(pady=10, fill="x")
-
-        # Cookie Section
-        cookie_frame = ctk.CTkFrame(control_frame)
-        cookie_frame.pack(side="left", padx=5)
-        ctk.CTkButton(cookie_frame, text="Fetch Cookies", 
-                    command=self.fetch_cookies, width=120).pack(side="left")
+        # Browser and Cookie Section
+        browser_frame = ctk.CTkFrame(self.main_frame)
+        browser_frame.pack(pady=5, fill="x")
         
-        # File Selection
-        file_frame = ctk.CTkFrame(control_frame)
-        file_frame.pack(side="left", padx=5)
-        self.csv_entry = ctk.CTkEntry(file_frame, width=300)
+        ctk.CTkButton(browser_frame, text="Fetch Institutional Cookies", 
+                     command=self.fetch_cookies, width=200).pack(side="left", padx=5)
+        
+        self.browser_status = ctk.CTkLabel(browser_frame, text="Status: Not checked", 
+                                         font=("Arial", 12), anchor="w")
+        self.browser_status.pack(side="left", fill="x", expand=True)
+
+        # File Selection Section
+        file_frame = ctk.CTkFrame(self.main_frame)
+        file_frame.pack(pady=10, fill="x")
+        
+        self.csv_entry = ctk.CTkEntry(file_frame, width=500)
         self.csv_entry.pack(side="left", padx=5)
+        
         ctk.CTkButton(file_frame, text="Browse CSV", width=100,
-                    command=self.browse_csv).pack(side="left")
+                     command=self.browse_csv).pack(side="left", padx=5)
 
         # Base Path Display
-        self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", anchor="w")
+        self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", 
+                                          anchor="w", font=("Arial", 12))
         self.base_path_label.pack(fill="x", padx=20, pady=5)
 
         # Progress Section
         self.progress_label = ctk.CTkLabel(self.main_frame, text="Ready", font=("Arial", 14))
         self.progress_label.pack(pady=5)
+        
         self.progress_bar = ctk.CTkProgressBar(self.main_frame)
         self.progress_bar.pack(fill="x", padx=20, pady=5)
         self.progress_bar.set(0)
@@ -73,6 +112,7 @@ class DownloadManager(ctk.CTk):
         # Stats Panel
         stats_frame = ctk.CTkFrame(self.main_frame)
         stats_frame.pack(pady=10)
+        
         self.stats_labels = {
             'total': ctk.CTkLabel(stats_frame, text="Total: 0"),
             'success': ctk.CTkLabel(stats_frame, text="Success: 0", text_color="green"),
@@ -85,6 +125,7 @@ class DownloadManager(ctk.CTk):
         # Content Tabs
         self.tab_view = ctk.CTkTabview(self.main_frame)
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
+        
         self.tabs = {}
         for name in ["Downloaded", "Failed", "Skipped"]:
             tab = self.tab_view.add(name)
@@ -93,35 +134,65 @@ class DownloadManager(ctk.CTk):
             self.tabs[name.lower()] = scroll_frame
 
         # Control Buttons
-        btn_frame = ctk.CTkFrame(self.main_frame)
-        btn_frame.pack(pady=10)
-        self.start_btn = ctk.CTkButton(btn_frame, text="Start Download", command=self.start_process)
+        control_frame = ctk.CTkFrame(self.main_frame)
+        control_frame.pack(pady=10)
+        
+        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", 
+                                      command=self.start_process, width=120)
         self.start_btn.pack(side="left", padx=10)
-        self.pause_btn = ctk.CTkButton(btn_frame, text="Pause", command=self.toggle_pause, state="disabled")
+        
+        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", 
+                                      command=self.toggle_pause, state="disabled", width=80)
         self.pause_btn.pack(side="left", padx=10)
-        self.stop_btn = ctk.CTkButton(btn_frame, text="Stop", command=self.stop_process, state="disabled")
+        
+        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", 
+                                     command=self.stop_process, state="disabled", width=80)
         self.stop_btn.pack(side="left", padx=10)
 
         # Status Bar
         status_bar = ctk.CTkFrame(self, height=30, corner_radius=0)
         status_bar.grid(row=1, column=0, sticky="ew")
         ctk.CTkLabel(status_bar, text="Developed by Niraj Bhagchandani", 
-                   font=("Arial", 12, "italic")).pack(side="right", padx=10)
+                    font=("Arial", 12, "italic")).pack(side="right", padx=10)
 
     def fetch_cookies(self):
         try:
-            cookies = browser_cookie3.load(domain_name='ieeexplore.ieee.org')
-            required_cookies = ['JSESSIONID', 'ERIGHTS', 'xpluserinfo', 'ipCheck', 'seqId']
-            self.cookies = {c.name: c.value for c in cookies if c.name in required_cookies}
+            browser = get_default_browser()
+            required_cookies = {'JSESSIONID', 'ERIGHTS', 'xpluserinfo', 'ipCheck'}
             
-            if not self.cookies:
-                messagebox.showwarning("Warning", "No institutional cookies found. Downloads may fail for protected content.")
-            else:
-                messagebox.showinfo("Success", "Institutional cookies loaded successfully!")
+            try:
+                cookies = browser_cookie3.load(domain_name='ieeexplore.ieee.org')
+                found_cookies = {c.name for c in cookies}
+                missing = required_cookies - found_cookies
                 
+                if missing:
+                    status_text = f"❌ Missing cookies: {', '.join(missing)}"
+                    status_color = "red"
+                    self.cookies = None
+                else:
+                    status_text = "✅ Institutional access verified"
+                    status_color = "green"
+                    self.cookies = {c.name: c.value for c in cookies}
+                
+            except PermissionError:
+                status_text = "⚠️ Close browser and run as admin!"
+                status_color = "orange"
+                self.cookies = None
+                messagebox.showwarning("Permission Needed", 
+                    "1. Close all browsers completely\n"
+                    "2. Right-click this app\n"
+                    "3. Select 'Run as administrator'")
+            
+            self.browser_status.configure(
+                text=f"{browser} Status: {status_text}",
+                text_color=status_color
+            )
+            
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to fetch cookies: {str(e)}")
-            self.cookies = None
+            self.browser_status.configure(
+                text=f"Error: {str(e)}",
+                text_color="red"
+            )
 
     def browse_csv(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
@@ -129,6 +200,7 @@ class DownloadManager(ctk.CTk):
             self.selected_csv = file_path
             self.csv_entry.delete(0, "end")
             self.csv_entry.insert(0, file_path)
+            
             filename = os.path.basename(file_path)
             base_name = os.path.splitext(filename)[0]
             sanitized_name = re.sub(r'[^a-zA-Z0-9_\- ]', '_', base_name)
@@ -140,8 +212,8 @@ class DownloadManager(ctk.CTk):
         self.queue = []
         self.progress_bar.set(0)
         self.progress_label.configure(text="Ready")
-        for key in self.stats_labels:
-            self.stats_labels[key].configure(text=f"{key.capitalize()}: 0")
+        for label in self.stats_labels.values():
+            label.configure(text=f"{label._text.split(':')[0]}: 0")
         for tab in self.tabs.values():
             for widget in tab.winfo_children():
                 widget.destroy()
@@ -151,21 +223,30 @@ class DownloadManager(ctk.CTk):
     def create_card(self, tab_name, title, status, url):
         parent = self.tabs[tab_name]
         frame = ctk.CTkFrame(parent, corner_radius=10)
-        status_color = {'success': "green", 'failed': "red", 'skipped': "orange"}[status]
-        ctk.CTkLabel(frame, text="●", text_color=status_color, font=("Arial", 24)).pack(side="left", padx=10)
+        status_color = {
+            'success': "green",
+            'failed': "red",
+            'skipped': "orange"
+        }[status]
+        
+        ctk.CTkLabel(frame, text="●", text_color=status_color, 
+                    font=("Arial", 24)).pack(side="left", padx=10)
+        
         text_frame = ctk.CTkFrame(frame, fg_color="transparent")
         ctk.CTkLabel(text_frame, text=title, font=("Arial", 12, "bold")).pack(anchor="w")
         ctk.CTkLabel(text_frame, text=url, font=("Arial", 10)).pack(anchor="w")
         text_frame.pack(side="left", fill="x", expand=True)
+        
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         if status == 'failed':
             ctk.CTkButton(btn_frame, text="Retry", width=80,
-                        command=lambda: self.retry_download(url)).pack(pady=2)
+                         command=lambda: self.retry_download(url)).pack(pady=2)
             ctk.CTkButton(btn_frame, text="Open Link", width=80,
-                        command=lambda: self.open_link(url)).pack(pady=2)
+                         command=lambda: self.open_link(url)).pack(pady=2)
         else:
             ctk.CTkButton(btn_frame, text="Open", width=80,
-                        command=lambda: self.open_file(url)).pack(pady=2)
+                         command=lambda: self.open_file(url)).pack(pady=2)
+        
         btn_frame.pack(side="right", padx=10)
         frame.pack(fill="x", padx=5, pady=2)
 
@@ -177,8 +258,8 @@ class DownloadManager(ctk.CTk):
         self.update_stats()
 
     def update_stats(self):
-        for key in self.stats_labels:
-            self.stats_labels[key].configure(text=f"{key.capitalize()}: {self.stats[key]}")
+        for key, label in self.stats_labels.items():
+            label.configure(text=f"{key.capitalize()}: {self.stats[key]}")
 
     def start_process(self):
         if not self.current_process or not self.current_process.is_alive():
@@ -217,10 +298,13 @@ class DownloadManager(ctk.CTk):
                 url_index = headers.index('PDF Link')
                 title_index = headers.index('Document Title')
                 category_index = headers.index('Document Identifier')
+
                 os.makedirs(self.base_path, exist_ok=True)
+
                 for row in reader:
                     if len(row) < max(url_index, title_index, category_index):
                         continue
+                    
                     entry = {
                         'title': row[title_index].strip(),
                         'url': row[url_index].strip(),
@@ -230,7 +314,9 @@ class DownloadManager(ctk.CTk):
                     }
                     self.queue.append(entry)
                     self.stats['total'] += 1
+
             self.after(0, self.update_stats)
+            
             for entry in self.queue:
                 if self.stopped.is_set():
                     break
@@ -238,17 +324,22 @@ class DownloadManager(ctk.CTk):
                     time.sleep(0.1)
                 if not entry['url']:
                     continue
+                
                 output_path = self.get_output_path(entry)
+                
                 if os.path.exists(output_path):
                     self.stats['skipped'] += 1
                     entry['status'] = 'skipped'
                     entry['processed'] = True
-                    self.after(0, lambda e=entry, p=output_path: self.create_card("skipped", e['title'], 'skipped', p))
+                    self.after(0, lambda e=entry, p=output_path: 
+                             self.create_card("skipped", e['title'], 'skipped', p))
                     self.after(0, self.update_progress)
                     continue
+                
                 self.download_paper(entry)
                 entry['processed'] = True
                 self.after(0, self.update_progress)
+
         except Exception as e:
             self.handle_error(str(e))
         finally:
@@ -269,7 +360,7 @@ class DownloadManager(ctk.CTk):
                 if not pdf_url:
                     raise ValueError("PDF URL not found")
                 
-                # Use cookies if available
+                # Use institutional cookies if available
                 cookies = self.cookies if self.cookies else {}
                 
                 response = requests.get(
@@ -289,14 +380,16 @@ class DownloadManager(ctk.CTk):
                     f.write(response.content)
                 
                 self.stats['success'] += 1
-                self.after(0, lambda e=entry, p=output_path: self.create_card("downloaded", e['title'], 'success', p))
+                self.after(0, lambda e=entry, p=output_path: 
+                         self.create_card("downloaded", e['title'], 'success', p))
                 return
 
             except Exception as e:
                 print(f"Attempt {attempt+1} failed: {str(e)}")
         
         self.stats['failed'] += 1
-        self.after(0, lambda e=entry: self.create_card("failed", e['title'], 'failed', e['url']))
+        self.after(0, lambda e=entry: 
+                 self.create_card("failed", e['title'], 'failed', e['url']))
 
     def get_pdf_url(self, stamp_url):
         try:
