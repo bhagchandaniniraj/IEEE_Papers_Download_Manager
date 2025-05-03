@@ -40,9 +40,13 @@ A modern Python desktop application to batch download IEEE research papers from 
 
 ## Screenshots
 
-<!-- Add screenshots here if available -->
-![App Screenshot](screenshot.png)
+### Main Interface
 
+![Main Interface](Screenshot/1.jpeg)
+
+### Download Progress
+
+![Download Progress](Screenshot/2.jpeg)
 ---
 
 ## Installation
