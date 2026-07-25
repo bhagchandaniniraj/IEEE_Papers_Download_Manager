@@ -11,7 +11,6 @@ import sys
 import ctypes
 import psutil
 import random
-import webbrowser
 from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor
 
@@ -83,35 +82,24 @@ class DownloadManager(ctk.CTk):
         browser_frame.pack(pady=5, fill="x")
         
         ctk.CTkButton(browser_frame, text="Fetch Institutional Cookies", 
-                      command=self.fetch_cookies, width=220).pack(side="left", padx=5)
-        
-        self.cookie_text = ctk.CTkTextbox(browser_frame, height=80, wrap="word")
-        self.cookie_text.pack(side="left", fill="x", expand=True, padx=5)
-        self.cookie_text.insert("1.0", "No cookies fetched")
-
-        # File Selection Section
-        file_frame = ctk.CTkFrame(self.main_frame)
-        file_frame.pack(pady=10, fill="x")
-        
-        self.csv_entry = ctk.CTkEntry(file_frame, width=500)
-        self.csv_entry.pack(side="left", padx=5)
-        
-        ctk.CTkButton(file_frame, text="Browse CSV", width=100,
-                      command=self.browse_csv).pack(side="left", padx=5)
+                     command=self.fetch_cookies, width=220).pack(side="left", padx=5)
+                     command=self.fetch_cookies, width=220).pack(side="left", padx=5)
+                     command=self.browse_csv).pack(side="left", padx=5)
 
         # Base Path Display
         self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", 
                                            anchor="w", font=("Arial", 12))
-        self.base_path_label.pack(fill="x", padx=20, pady=5)
+                     command=self.browse_csv).pack(side="left", padx=5)
 
-        # Next Download Info
-        self.next_doc_frame = ctk.CTkFrame(self.main_frame)
-        self.next_doc_frame.pack(pady=5, fill="x")
-        
-        ctk.CTkLabel(self.next_doc_frame, text="Next Download:", 
+        # Base Path Display
+        self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", 
+                                          anchor="w", font=("Arial", 12))
                      font=("Arial", 12, "bold")).pack(side="left", padx=5)
         self.next_doc_label = ctk.CTkLabel(self.next_doc_frame, text="No pending downloads",
                                           wraplength=1000, justify="left")
+                    font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        self.next_doc_label = ctk.CTkLabel(self.next_doc_frame, text="No pending downloads",
+                                         wraplength=1000, justify="left")
         self.next_doc_label.pack(side="left", fill="x", expand=True)
         self.countdown_label = ctk.CTkLabel(self.next_doc_frame, text="")
         self.countdown_label.pack(side="right", padx=10)
@@ -134,17 +122,7 @@ class DownloadManager(ctk.CTk):
         for label in self.stats_labels.values():
             label.pack(side="left", padx=10)
 
-        # Control Buttons Packed FIRST at the Bottom (Fixes resolution/visibility clipping)
-        control_frame = ctk.CTkFrame(self.main_frame)
-        control_frame.pack(side="bottom", pady=10)
-        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", command=self.start_process)
-        self.start_btn.pack(side="left", padx=10)
-        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", command=self.toggle_pause, state="disabled")
-        self.pause_btn.pack(side="left", padx=10)
-        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", command=self.stop_process, state="disabled")
-        self.stop_btn.pack(side="left", padx=10)
-
-        # Content Tabs Packed SECOND to expand safely in the remaining middle space
+        # Content Tabs
         self.tab_view = ctk.CTkTabview(self.main_frame)
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
         self.tabs = {}
@@ -153,7 +131,17 @@ class DownloadManager(ctk.CTk):
             scroll_frame = ctk.CTkScrollableFrame(tab)
             scroll_frame.pack(fill="both", expand=True)
             self.tabs[name.lower()] = scroll_frame
+        # Control Buttons
+        control_frame = ctk.CTkFrame(self.main_frame)
+        control_frame.pack(pady=10)
+        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", command=self.start_process)
+        self.start_btn.pack(side="left", padx=10)
+        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", command=self.toggle_pause, state="disabled")
+        self.pause_btn.pack(side="left", padx=10)
+        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", command=self.stop_process, state="disabled")
+        self.stop_btn.pack(side="left", padx=10)
 
+>>>>>>> 983b822a2d73276d868a9e16d98132d5459943cf
         # Status Bar
         self.status_bar = ctk.CTkFrame(self, height=30)
         self.status_bar.grid(row=1, column=0, sticky="ew")
@@ -431,3 +419,4 @@ if __name__ == "__main__":
         app.mainloop()
     except Exception as e:
         messagebox.showerror("Fatal Error", f"Application failed to start:\n{str(e)}")
+
