@@ -1,146 +1,112 @@
-# IEEE Paper Download Manager
+**IEEE Paper Download Manager**
 
-A modern Python desktop application to batch download IEEE research papers from a CSV file, with a beautiful GUI, progress tracking, and robust error handling.
+An automated desktop application designed to batch-download research papers from IEEE Xplore using exported CSV metadata. Features institutional cookie authentication, dynamic rate limiting, real-time memory monitoring, and automatic folder organization.
 
----
+**Table of Contents**
 
-## Table of Contents
+*   [Quick Start (Executable)](https://www.google.com/search?q=#quick-start-executable)
+    
+*   [Key Features](https://www.google.com/search?q=#key-features)
+    
+*   [How It Works](https://www.google.com/search?q=#how-it-works)
+    
+*   [Screenshots & Workflow](https://www.google.com/search?q=#screenshots--workflow)
+    
+*   [Running from Source](https://www.google.com/search?q=#running-from-source)
+    
+*   [Building the Executable](https://www.google.com/search?q=#building-the-executable)
+    
+*   [CSV Structure](https://www.google.com/search?q=#csv-structure)
+    
+*   [Author & Credits](https://www.google.com/search?q=#author--credits)
+    
+*   [License](https://www.google.com/search?q=#license)
+    
 
-- [About the Project](#about-the-project)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Installation](#installation)
-  - [Windows](#windows)
-  - [Linux](#linux)
-- [Usage](#usage)
-- [CSV Format](#csv-format)
-- [Author](#author)
-- [License](#license)
+**Quick Start (Executable)**
 
----
+If you don't have Python installed, you can run the standalone Windows executable directly:
 
-## About the Project
+1.  Navigate to the dist/ folder in this repository.
+    
+2.  Download **ieee\_gui.exe**.
+    
+3.  Double-click **ieee\_gui.exe** to launch the application. _(Note: Accepts Windows Administrator prompt to allow browser process handling and institutional cookie retrieval)._
+    
 
-**IEEE Paper Download Manager** is a cross-platform GUI tool that automates the downloading of IEEE research papers using a CSV file as input. It provides real-time progress, pause/resume/stop controls, and categorizes downloads as successful, failed, or skipped. The application is built with Python and [customtkinter](https://github.com/TomSchimansky/CustomTkinter) for a modern look and feel.
+**Key Features**
 
----
+*   **Institutional Cookie Fetcher**: Automatically extracts required IEEE session cookies (JSESSIONID, ERIGHTS, xpluserinfo, ipCheck) directly from your browser (browser\_cookie3) to inherit institutional download access.
+    
+*   **Anti-Bot Delay System**: Implements randomized delays between downloads to ensure smooth processing and prevent rate limits.
+    
+*   **Dynamic File Organization**: Automatically creates subfolders based on your CSV file name and Document Identifier metadata.
+    
+*   **Full Execution Controls**: Pause, Resume, or Stop download queues at any time.
+    
+*   **Resource Monitoring**: Tracks application memory and system RAM usage in real time.
+    
+*   **Duplicate Skipping & Validation**: Detects pre-existing files to skip re-downloads and verifies valid PDF headers (%PDF / %%EOF).
+    
+*   **File & Folder Actions**: Dedicated buttons to open downloaded PDFs directly or navigate to their folder location in Windows Explorer.
+    
 
-## Features
+**How It Works**
 
-- 📂 **CSV-based Batch Download**: Select your CSV, and the app will process all entries.
-- 🖥️ **Modern GUI**: Built with customtkinter for a beautiful, responsive interface.
-- 🟢 **Success/Failed/Skipped Tabs**: See which papers were downloaded, failed, or already existed.
-- 🔄 **Pause, Resume, Stop**: Control your download process at any time.
-- 📊 **Live Counters & Progress Bar**: Track total, success, failed, skipped, and progress.
-- 🗂️ **Dynamic Folder Structure**: Output folders are named after your CSV file (special characters replaced).
-- 🖱️ **Open/Retry/Manual Download**: Open files directly, retry failed downloads, or open failed links in your browser.
-- 🏁 **Cross-Platform**: Works on both Windows and Linux.
+1.  **Authentication**: Retrieves IEEE session cookies from an active browser session where institutional access is active.
+    
+2.  **Parsing**: Processes the selected CSV file containing PDF links, titles, and category identifiers.
+    
+3.  **Download Execution**: Resolves arnumber parameters into direct PDF endpoints (stampPDF/getPDF.jsp) and streams content asynchronously.
+    
 
----
+Screenshots & Workflow
+----------------------
 
-## Screenshots
+**1\. Exporting CSV Metadata from IEEE Xplore**
 
-### Main Interface
+Search for research papers on IEEE Xplore, select **Subscribed Content** or **Open Access**, and click **Export** to save the query metadata as a CSV file.
 
-![Main Interface](/Screenshot/1.png)
+**2\. Processing Downloads via IEEE Download Manager**
 
-### Download Progress
+Import the CSV file, initiate the automated queue, and monitor live progress across dedicated tabs (**Downloaded**, **Failed**, **Skipped**).
 
-![Download Progress](/Screenshot/2.png)
----
+**Running from Source**
 
-## Installation
+Prerequisites
 
-### Windows
+*   Python **3.8+**
+    
+*   Windows OS
+    
 
-1. **Install Python 3.8+** from [python.org](https://python.org).
-2. **Install dependencies**:
-pip install customtkinter requests
-3. **Run the application**:
+Setup Instructions
 
-python ieee_gui.py
+1.  Bashgit clone https://github.com/bhagchandaniniraj/IEEE\_Papers\_Download\_Manager.gitcd IEEE\_Papers\_Download\_Manager
+    
+2.  Bashpip install customtkinter requests browser\_cookie3 psutil
+    
+3.  Bashpython ieee\_gui.py
+    
 
-text
+**Building the Executable**
 
-**Optional: Create a Standalone Executable**
-- Install PyInstaller:
-pip install pyinstaller
+If you modify the source code and want to recompile the .exe:
 
-text
-- Build the app:
-pyinstaller --onefile --windowed --icon=icon.ico ieee_gui.py
+1.  pip install pyinstaller
+    
+2.  pyinstaller --noconfirm --onefile --windowed --uac-admin --icon=icon.ico --collect-all customtkinter --collect-all browser\_cookie3 ieee\_gui.py
+    
+3.  IEEE\_Papers\_Download\_Manager/└── dist/ └── ieee\_gui.exe
+    
 
-text
-- Find the `.exe` in the `dist/` folder and double-click to run.
+**Author & Credits**
 
----
+*   **Developer**: Niraj Bhagchandani
+    
+*   **GitHub Repository**: [bhagchandaniniraj/IEEE\_Papers\_Download\_Manager](https://www.google.com/search?q=https://github.com/bhagchandaniniraj/IEEE_Papers_Download_Manager)
+    
 
-### Linux
+**License**
 
-1. **Install Python 3.8+** (usually pre-installed).
-2. **Install dependencies**:
-pip install customtkinter requests
-
-text
-3. **Run the application**:
-python3 ieee_gui.py
-
-text
-
-**Optional: Create a Standalone Executable**
-- Install PyInstaller:
-pip install pyinstaller
-
-text
-- Build the app:
-pyinstaller --onefile --windowed ieee_gui.py
-
-text
-- The executable will be in the `dist/` folder.
-- For a desktop shortcut, create a `.desktop` file pointing to the executable.
-
----
-
-## Usage
-
-1. **Open the app** and click **Browse CSV** to select your CSV file.
-2. The app will auto-generate an output folder based on your CSV name.
-3. Click **Start Download** to begin.
-4. Use **Pause**, **Resume**, or **Stop** as needed.
-5. Monitor the **Downloaded**, **Failed**, and **Skipped** tabs.
-6. Use **Open**, **Retry**, or **Open Link** buttons for each entry.
-
----
-
-## CSV Format
-
-Your CSV should have at least these columns (case-sensitive):
-
-- `Document Title`
-- `PDF Link` (the IEEE wrapper or direct PDF URL)
-- `Document Identifier` (used for subfolders)
-
-Example:
-
-| Document Title | PDF Link | Document Identifier |
-|----------------|----------|--------------------|
-| Example Paper  | https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=1234567 | Machine_Learning |
-
----
-
-## Author
-
-**Niraj Kumar**  
-- [GitHub](https://github.com/yourusername)
-- [LinkedIn](https://www.linkedin.com/in/yourprofile)
-- Email: your.email@example.com
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-> _Inspired by best practices from [Best-README-Template][5], [DhiWise][6], and [Make a README][7]._  
+This project is licensed under the [MIT License](https://www.google.com/search?q=LICENSE).
