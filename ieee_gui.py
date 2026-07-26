@@ -11,6 +11,8 @@ import sys
 import ctypes
 import psutil
 import random
+import webbrowser
+import subprocess
 from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor
 
@@ -44,7 +46,8 @@ def kill_browser_processes():
 class DownloadManager(ctk.CTk):
     def __init__(self):
         if not is_admin():
-            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+            # SW_HIDE (0) prevents flashing/opening a cmd console window when elevating admin
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 0)
             sys.exit()
             
         super().__init__()
@@ -82,7 +85,7 @@ class DownloadManager(ctk.CTk):
         browser_frame.pack(pady=5, fill="x")
         
         ctk.CTkButton(browser_frame, text="Fetch Institutional Cookies", 
-                     command=self.fetch_cookies, width=220).pack(side="left", padx=5)
+                      command=self.fetch_cookies, width=220).pack(side="left", padx=5)
         
         self.cookie_text = ctk.CTkTextbox(browser_frame, height=80, wrap="word")
         self.cookie_text.pack(side="left", fill="x", expand=True, padx=5)
@@ -96,11 +99,11 @@ class DownloadManager(ctk.CTk):
         self.csv_entry.pack(side="left", padx=5)
         
         ctk.CTkButton(file_frame, text="Browse CSV", width=100,
-                     command=self.browse_csv).pack(side="left", padx=5)
+                      command=self.browse_csv).pack(side="left", padx=5)
 
         # Base Path Display
         self.base_path_label = ctk.CTkLabel(self.main_frame, text="Base Path: Not Set", 
-                                          anchor="w", font=("Arial", 12))
+                                           anchor="w", font=("Arial", 12))
         self.base_path_label.pack(fill="x", padx=20, pady=5)
 
         # Next Download Info
@@ -108,9 +111,9 @@ class DownloadManager(ctk.CTk):
         self.next_doc_frame.pack(pady=5, fill="x")
         
         ctk.CTkLabel(self.next_doc_frame, text="Next Download:", 
-                    font=("Arial", 12, "bold")).pack(side="left", padx=5)
+                     font=("Arial", 12, "bold")).pack(side="left", padx=5)
         self.next_doc_label = ctk.CTkLabel(self.next_doc_frame, text="No pending downloads",
-                                         wraplength=1000, justify="left")
+                                          wraplength=1000, justify="left")
         self.next_doc_label.pack(side="left", fill="x", expand=True)
         self.countdown_label = ctk.CTkLabel(self.next_doc_frame, text="")
         self.countdown_label.pack(side="right", padx=10)
@@ -133,6 +136,16 @@ class DownloadManager(ctk.CTk):
         for label in self.stats_labels.values():
             label.pack(side="left", padx=10)
 
+        # Control Buttons
+        control_frame = ctk.CTkFrame(self.main_frame)
+        control_frame.pack(side="bottom", pady=10)
+        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", command=self.start_process)
+        self.start_btn.pack(side="left", padx=10)
+        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", command=self.toggle_pause, state="disabled")
+        self.pause_btn.pack(side="left", padx=10)
+        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", command=self.stop_process, state="disabled")
+        self.stop_btn.pack(side="left", padx=10)
+
         # Content Tabs
         self.tab_view = ctk.CTkTabview(self.main_frame)
         self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
@@ -142,16 +155,6 @@ class DownloadManager(ctk.CTk):
             scroll_frame = ctk.CTkScrollableFrame(tab)
             scroll_frame.pack(fill="both", expand=True)
             self.tabs[name.lower()] = scroll_frame
-
-        # Control Buttons
-        control_frame = ctk.CTkFrame(self.main_frame)
-        control_frame.pack(pady=10)
-        self.start_btn = ctk.CTkButton(control_frame, text="Start Download", command=self.start_process)
-        self.start_btn.pack(side="left", padx=10)
-        self.pause_btn = ctk.CTkButton(control_frame, text="Pause", command=self.toggle_pause, state="disabled")
-        self.pause_btn.pack(side="left", padx=10)
-        self.stop_btn = ctk.CTkButton(control_frame, text="Stop", command=self.stop_process, state="disabled")
-        self.stop_btn.pack(side="left", padx=10)
 
         # Status Bar
         self.status_bar = ctk.CTkFrame(self, height=30)
@@ -227,6 +230,39 @@ class DownloadManager(ctk.CTk):
         self.countdown_label.configure(text="")
         self.update_stats()
 
+    def open_file_action(self, file_path):
+        """Safely opens PDF via default app or browser fallback without triggering CMD."""
+        try:
+            abs_path = os.path.abspath(file_path)
+            if not os.path.exists(abs_path):
+                messagebox.showerror("File Error", f"File not found on disk:\n{abs_path}")
+                return
+
+            try:
+                os.startfile(abs_path)
+            except Exception:
+                file_url = f"file:///{abs_path.replace(os.sep, '/')}"
+                webbrowser.open(file_url)
+
+        except Exception as e:
+            messagebox.showerror("Open Error", f"Could not open file:\n{str(e)}")
+
+    def open_folder_action(self, file_path):
+        """Opens Explorer and selects the file without spawning a cmd window."""
+        try:
+            abs_path = os.path.abspath(file_path)
+            if os.path.exists(abs_path):
+                # Using subprocess without shell=True avoids launching cmd.exe
+                subprocess.Popen(['explorer', '/select,', abs_path], creationflags=0x08000000)
+            else:
+                folder = os.path.dirname(abs_path)
+                if os.path.exists(folder):
+                    os.startfile(folder)
+                else:
+                    messagebox.showerror("Folder Error", f"Folder not found:\n{folder}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open folder:\n{str(e)}")
+
     def create_card(self, tab_name, title, status, url, size=0):
         parent = self.tabs[tab_name]
         frame = ctk.CTkFrame(parent, corner_radius=10)
@@ -248,7 +284,9 @@ class DownloadManager(ctk.CTk):
                          command=lambda: webbrowser.open(url)).pack(pady=2)
         else:
             ctk.CTkButton(btn_frame, text="Open", width=80,
-                         command=lambda: os.startfile(url)).pack(pady=2)
+                         command=lambda path=url: self.open_file_action(path)).pack(pady=2)
+            ctk.CTkButton(btn_frame, text="Open Folder", width=80,
+                         command=lambda path=url: self.open_folder_action(path)).pack(pady=2)
         
         btn_frame.pack(side="right", padx=10)
         frame.pack(fill="x", padx=5, pady=2)
@@ -310,25 +348,23 @@ class DownloadManager(ctk.CTk):
 
                     output_path = self.get_output_path(entry)
                     
-                    # Skip existing files immediately
                     if os.path.exists(output_path):
+                        actual_size = os.path.getsize(output_path)
                         self.stats['skipped'] += 1
-                        self.stats['skipped_size'] += os.path.getsize(output_path)
+                        self.stats['skipped_size'] += actual_size
                         entry['status'] = 'skipped'
                         entry['processed'] = True
-                        self.after(0, lambda e=entry, p=output_path: self.create_card(
-                            "skipped", e['title'], 'skipped', p, os.path.getsize(p)))
+                        self.after(0, lambda e=entry, p=output_path, s=actual_size: self.create_card(
+                            "skipped", e['title'], 'skipped', p, s))
                         self.after(0, self.update_progress)
                         continue
 
-                    # Show next download preview
                     next_info = "No more pending downloads"
                     if index + 1 < len(self.download_queue):
                         next_entry = self.download_queue[index + 1]
                         next_info = f"Next: {next_entry['title']}\nURL: {next_entry['url']}"
                     self.after(0, lambda: self.next_doc_label.configure(text=next_info))
 
-                    # Apply random delay
                     delay = random.randint(*DELAY_RANGE)
                     for sec in range(delay, 0, -1):
                         if self.stopped.is_set():
@@ -341,7 +377,6 @@ class DownloadManager(ctk.CTk):
                         time.sleep(1)
                     self.after(0, lambda: self.countdown_label.configure(text=""))
 
-                    # Process download
                     self.download_paper(entry)
                     entry['processed'] = True
                     self.after(0, self.update_progress)
@@ -352,10 +387,10 @@ class DownloadManager(ctk.CTk):
             self.after(0, self.stop_process)
 
     def get_output_path(self, entry):
-        folder = os.path.join(self.base_path, entry['category'])
+        folder = os.path.abspath(os.path.join(self.base_path, entry['category']))
         os.makedirs(folder, exist_ok=True)
         filename = re.sub(r'[^a-zA-Z0-9_\- ]', '_', entry['title'])[:100] + ".pdf"
-        return os.path.join(folder, filename)
+        return os.path.abspath(os.path.join(folder, filename))
 
     def download_paper(self, entry):
         for attempt in range(MAX_RETRIES):
@@ -377,7 +412,6 @@ class DownloadManager(ctk.CTk):
                     raise ValueError("Invalid PDF content")
                 
                 output_path = self.get_output_path(entry)
-                file_size = int(response.headers.get('content-length', 0))
                 
                 with open(output_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -385,14 +419,16 @@ class DownloadManager(ctk.CTk):
                             return
                         f.write(chunk)
                 
+                actual_file_size = os.path.getsize(output_path)
                 self.stats['success'] += 1
-                self.stats['success_size'] += file_size
-                self.after(0, lambda e=entry, p=output_path: self.create_card(
-                    "downloaded", e['title'], 'success', p, file_size))
+                self.stats['success_size'] += actual_file_size
+                
+                self.after(0, lambda e=entry, p=output_path, s=actual_file_size: self.create_card(
+                    "downloaded", e['title'], 'success', p, s))
                 return
 
-            except Exception as e:
-                print(f"Attempt {attempt+1} failed: {str(e)}")
+            except Exception:
+                pass
         
         self.stats['failed'] += 1
         self.after(0, lambda e=entry: self.create_card("failed", e['title'], 'failed', e['url']))
